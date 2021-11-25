@@ -24,8 +24,6 @@ Local Infix "⊆" := incl (at level 70, no associativity).
 
 Notation "'lhd' l" := (∃ x m, l ~ₚ x::x::m) (at level 1).
 
-Local Reserved Notation "x ↑ n" (at level 1, left associativity, format "x ↑ n").
-
 Section php_short.
 
   Variable (X : Type).
@@ -36,45 +34,26 @@ Section php_short.
                in_eq in_cons incl_tl
                incl_refl incl_tran : core.
 
-  (** Repeat facts*)
+  Reserved Notation "x ↑ n" (at level 1, left associativity, format "x ↑ n").
 
-  Fixpoint repeat (x:X) n :=
+  Fixpoint repeat x n :=
     match n with
       | 0 => nil
       | S n => x::x↑n
     end
   where "x ↑ n" := (repeat x n).
 
-  Fact incl_sg_repeat l x : l ⊆ [x] → { n | l = x↑n }.
-  Proof. 
-    intros H; exists ⌊l⌋; revert H.
-    induction l as [ | y l IHl ]; simpl; auto. 
-    intros H; apply incl_cons_inv in H as [ [ <- | [] ] ]; f_equal; auto.
-  Qed.
-
-  (** Membership vs permutation *)
-
-  Fact In_perm x l : x ∈ l → ∃m, l ~ₚ x::m.
-  Proof. intro H; apply in_split in H as (? & ? & ->); eauto. Qed.
-
-  Lemma incl_app_perm m l r : m ⊆ l++r → ∃ mₗ mᵣ, m ~ₚ mₗ++mᵣ ∧ mₗ ⊆ l ∧ mᵣ ⊆ r.
+  Lemma incl_cons_perm m x l : m ⊆ x::l → ∃ n m', m ~ₚ x↑n++m' ∧ m' ⊆ l.
   Proof.
-    induction m as [ | x m IHm ].
-    + exists [], []; auto.
-    + intros H; apply incl_cons_inv in H as (H1 & H2).
-      apply IHm in H2 as (a & b & ? & ? & ?).
-      apply in_app_or in H1 as [H1 | H1];
-        destruct In_perm with (1 := H1).
-      * exists (x::a), b; repeat split; simpl; auto.
-      * exists a, (x::b); repeat split; eauto.
-  Qed.
-
-  Corollary incl_cons_perm m x l : m ⊆ x::l → ∃ n m', m ~ₚ x↑n++m' ∧ m' ⊆ l.
-  Proof. 
-    intros H. 
-    apply incl_app_perm with (l := [_]) in H
-      as (? & ? & ? & H & ?). 
-    apply incl_sg_repeat in H as (? & ->); eauto.
+    induction m as [ | y m IHm ].
+    + exists 0, []; auto.
+    + intros H. 
+      apply incl_cons_inv in H as (Hy & H).
+      destruct (IHm H) as (n & m' & H1 & H2).
+      destruct Hy as [ <- | Hy ].
+      * exists (S n), m'; split; simpl; auto.
+      * exists n, (y::m'); split; auto.
+        rewrite <- Permutation_middle; auto.
   Qed.
 
   Theorem php_short l m : l ⊆ m → ⌊m⌋ < ⌊l⌋ → lhd l.
@@ -95,6 +74,10 @@ Section php_short.
         - exists y, (x::m').
           apply perm_trans with (1 := H1); eauto.
   Qed.
+
+  (* The below proof is trivial but tedious due
+     to several possibility in the respective positions 
+     of the duplicated x *)
 
   Fact lhd_split l : lhd l → ∃ x a b c, l = a++x::b++x::c.
   Proof.
@@ -118,3 +101,5 @@ Section php_short.
   Proof. eauto. Qed.
 
 End php_short.
+
+Check php.
