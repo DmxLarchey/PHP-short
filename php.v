@@ -38,24 +38,37 @@ Section php_short.
 
   Fixpoint repeat x n :=
     match n with
-      | 0 => nil
+      | 0   => []
       | S n => x::x↑n
     end
   where "x ↑ n" := (repeat x n).
 
-  Lemma incl_cons_perm m x l : m ⊆ x::l → ∃ n m', m ~ₚ x↑n++m' ∧ m' ⊆ l.
+  (* If l ⊆ x::m then, up to permutation, l splits
+     in two parts, one consisting in a repetition of x,
+     and the other contained in m. Notice that w/o
+     a decider equality, we cannot ensure that l'
+     does not contain x *)
+
+  Lemma incl_cons_perm l x m : l ⊆ x::m → ∃ n l', l ~ₚ x↑n++l' ∧ l' ⊆ m.
   Proof.
-    induction m as [ | y m IHm ].
+    induction l as [ | y l IHl ].
     + exists 0, []; auto.
     + intros H. 
       apply incl_cons_inv in H as (Hy & H).
-      destruct (IHm H) as (n & m' & H1 & H2).
+      destruct (IHl H) as (n & l' & H1 & H2).
       destruct Hy as [ <- | Hy ].
-      * exists (S n), m'; split; simpl; auto.
-      * exists n, (y::m'); split; auto.
+      * exists (S n), l'; split; simpl; auto.
+      * exists n, (y::l'); split; auto.
         rewrite <- Permutation_middle; auto.
   Qed.
 
+  (* In the recursive case l ⊆ x::m, 
+     we get either 
+        - l ~ₚ l'    and l' ⊆ m (apply IH to l')
+        - l ~ₚ x::l' and l' ⊆ m (apply IH to l')
+        - l ~ₚ x::x::... and finished
+   *)
+ 
   Theorem php_short l m : l ⊆ m → ⌊m⌋ < ⌊l⌋ → lhd l.
   Proof.
     revert l; induction m as [ | x m IHm ]; intros l H1 H2.
@@ -76,7 +89,7 @@ Section php_short.
   Qed.
 
   (* The below proof is trivial but tedious due
-     to several possibility in the respective positions 
+     to several possibilities in the respective positions 
      of the duplicated x *)
 
   Fact lhd_split l : lhd l → ∃ x a b c, l = a++x::b++x::c.
@@ -88,7 +101,7 @@ Section php_short.
     rewrite <- Permutation_middle in Hm.
     apply Permutation_cons_inv in Hm.
     destruct (in_app_or a k x) as [ Hx | Hx ].
-    + apply Permutation_in with (1 := Hm); auto.
+    1: apply Permutation_in with (1 := Hm); auto.
     + apply in_split in Hx as (? & ? & ->).
       eexists _, _, _, _; simpl; rewrite app_ass; simpl; eauto.
     + apply in_split in Hx as (? & ? & ->).
