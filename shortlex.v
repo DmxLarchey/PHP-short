@@ -33,14 +33,14 @@ End measure_rect.
 Tactic Notation "induction" "on" hyp(x) "as" ident(IH) "with" "measure" uconstr(f) :=
   pattern x; revert x; apply measure_rect with (m := fun x => f); intros x IH.
 
-Section less_than_wf.
+Section shortlex.
 
   Variable (X : Type) (R : X -> X -> Prop) (Rwf : well_founded R).
 
   Notation "⌊ l ⌋" := (length l) (at level 0, format "⌊ l ⌋").
 
-  Reserved Notation "l '<lex' m" (at level 70).  (* for lexicographic product *)
-  Reserved Notation "l '<<' m" (at level 70).    (* for less than *)
+  Reserved Notation "l '<lex' m" (at level 70).     (* for lexicographic product *)
+  Reserved Notation "l '<slex' m" (at level 70).    (* for the shortlex order *)
 
   Inductive lex : list X -> list X -> Prop :=
     | lex_skip x l m : l <lex m -> x::l <lex x::m
@@ -77,65 +77,64 @@ Section less_than_wf.
     intros m; induction on m as IHm with measure ⌊m⌋.
     destruct m as [ | y m ].
     + constructor; intros l Hl; apply lex_cons_inv in Hl; easy.
-    + revert m IHm.
-      induction y as [ y IHy' ] using (well_founded_induction Rwf).
-      intros m IHm.
-      assert (Acc lex m) as Hm.
-      1: apply IHm; simpl; auto.
+    + induction y as [ y IHy' ] using (well_founded_induction Rwf) in m, IHm |- *.
+      assert (Acc lex m) as Hm by (apply IHm; simpl; auto).
       assert (forall x l, R x y -> ⌊l⌋ = ⌊m⌋ -> Acc lex (x::l)) as IHy.
       1: { intros x l Hx Hl; apply IHy'; auto.
            intros; apply IHm.
            simpl in *; rewrite <- Hl; auto. }
       clear IHy' IHm.
-      revert Hm IHy.
-      induction 1 as [ m Hm IHm ]; intros IHy.
-      constructor; intros l Hl; apply lex_cons_inv in Hl.
-      destruct l as [ | x l ]; try tauto.
+      induction Hm as [ m Hm IHm ] in IHy |- *.
+      constructor; intros l Hl. 
+      apply lex_cons_inv in Hl; destruct l as [ | x l ]; try tauto.
       destruct Hl as [ (-> & Hl) | (Hx & Hl) ].
       * apply IHm; auto.
         apply lex_length in Hl as ->; auto.
       * apply IHy; auto.
   Qed.
 
-  Inductive less_than : list X -> list X -> Prop :=
-    | less_than_lt l m : ⌊l⌋ < ⌊m⌋ -> l << m
-    | less_than_eq l m : l <lex m -> l << m
-  where "l << m" := (less_than l m).
+  Unset Elimination Schemes.
 
-  Hint Constructors less_than : core.
+  Inductive slex : list X -> list X -> Prop :=
+    | slex_lt l m : ⌊l⌋ < ⌊m⌋ -> l <slex m
+    | slex_eq l m : l <lex m  -> l <slex m
+  where "l <slex m" := (slex l m).
 
-  Fact less_than_inv l m : l << m <-> ⌊l⌋ < ⌊m⌋ \/ l <lex m.
+  Set Elimination Schemes.
+
+  Hint Constructors slex : core.
+
+  Fact slex_inv l m : l <slex m <-> ⌊l⌋ < ⌊m⌋ \/ l <lex m.
   Proof. 
     split. 
     + inversion 1; auto. 
     + intros []; eauto. 
   Qed.
 
-  Theorem less_than_wf : well_founded less_than.
+  Theorem slex_wf : well_founded slex.
   Proof.
     intros m.
-    induction on m as IHl with measure (length m).
+    induction on m as IH with measure ⌊m⌋.
     induction m as [ m IHm ] using (well_founded_induction lex_wf).
     constructor; intros l Hl. 
-    apply less_than_inv in Hl as [ Hl | Hl ].
-    + apply IHl; auto.
-    + apply IHm; auto.
-      apply lex_length in Hl as ->; eauto.
+    apply slex_inv in Hl as [ Hl | Hl ]; auto.
+    apply IHm; auto.
+    apply lex_length in Hl as ->; eauto.
   Qed.
 
-  Section less_than_rect.
+  Section slex_rect.
 
     Variable (P : list X -> Type)
              (HP : forall m, (forall l, ⌊l⌋ < ⌊m⌋ -> P l)
                           -> (forall l, l <lex m  -> P l)
                           -> P m).
 
-    Corollary less_than_rect m : P m.
+    Corollary shortlex_rect m : P m.
     Proof.
-      induction m using (well_founded_induction_type less_than_wf).
+      induction m using (well_founded_induction_type slex_wf).
       apply HP; eauto.
     Qed.
   
-  End less_than_rect.
+  End slex_rect.
 
-End less_than_wf.
+End shortlex.
