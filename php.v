@@ -327,4 +327,40 @@ Section Cantor_Bernstein_finite.
 
 End Cantor_Bernstein_finite.
 
-Check Cantor_Bernstein_finite.
+Section Kuratowski.
+
+  Variable (X : Type).
+
+  Inductive kuratowski_fin : (X -> Prop) -> Prop :=
+    | kfin_empty P : (forall x, ~ P x) -> kuratowski_fin P
+    | kfin_cons P y Q : (forall x, P x <-> y = x \/ Q x) -> kuratowski_fin Q -> kuratowski_fin P.
+
+  Fact kuratowski_fin_listable P : kuratowski_fin P -> exists l, forall x, P x <-> x ∈ l.
+  Proof.
+    induction 1 as [ P HP | P y Q HP HQ (l & Hl) ].
+    + exists nil; simpl; firstorder.
+    + exists (y::l); intro; rewrite HP, Hl; simpl; firstorder.
+  Qed.
+
+  Fact listable_kuratowski_fin P : (exists l, forall x, P x <-> x ∈ l) -> kuratowski_fin P.
+  Proof.
+    intros (l & Hl); revert P Hl.
+    induction l as [ | y l IHl ]; intros P Hl.
+    + constructor 1; intro; rewrite Hl; simpl; tauto.
+    + constructor 2 with y (fun x => In x l); auto.
+      apply IHl; tauto.
+  Qed.
+
+End Kuratowski.
+
+Definition kuratowski_finite X := kuratowski_fin (fun _ : X => True).
+
+Fact kuratowski_finite_listable X : kuratowski_finite X -> exists l, forall x : X, x ∈ l.
+Proof.
+  intros H.
+  apply kuratowski_fin_listable in H as (l & Hl).
+  exists l; intro; apply Hl; auto.
+Qed.
+
+
+  
