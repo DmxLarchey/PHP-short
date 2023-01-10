@@ -362,5 +362,31 @@ Proof.
   exists l; intro; apply Hl; auto.
 Qed.
 
+Section Marc_Hermes.
+
+  (* Follow up on https://hermesmarc.github.io/2022/07/22/function-cycling.html *)
+
+  Variables (X : Type) (Xfin : exists l, forall x : X, In x l) (f : X -> X).
+
+  Fact Puzzle_1 : inhabited X -> exists a c, 0 < c /\ iter f c a = a.
+  Proof.
+    destruct Xfin as (l & Hl).
+    intros [ x ].
+    set (m := map (fun n => iter f n x) (list_an 0 (S ⌊l⌋))).
+    destruct (@php _ m l) as (a & u & v & w & Ha).
+    + intros ? _; apply Hl.
+    + unfold m; rewrite map_length, list_an_length; auto.
+    + unfold m in Ha.
+      apply map_eq_app in Ha as (lu & [ | p l' ] & H & Hu & Ha).
+      1: easy.
+      simpl in Ha; apply cons_inj in Ha as (Hp & Ha).
+      apply map_eq_app in Ha as (lv & [ | q lw ] & H' & Hv & Ha).
+      1: easy.
+      simpl in Ha; apply cons_inj in Ha as (Hq & Ha).
+      exists a, (q-p).
+  Admitted.
+
+End Marc_Hermes.
+
 
   
