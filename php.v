@@ -394,7 +394,10 @@ Qed.
 
 Section Marc_Hermes.
 
-  (* Follow up on https://hermesmarc.github.io/2022/07/22/function-cycling.html *)
+  (** Follow up on https://hermesmarc.github.io/2022/07/22/function-cycling.html 
+
+      Notice that the statement of Puzzle 1 is incorrect because X could be empty
+      Notice that the constraint k < c in Puzzle 2 seems a bit artificial *)
 
   Variable (X : Type) (Xfin : exists l : list X, forall x, x ∈ l).
 
