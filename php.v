@@ -195,6 +195,14 @@ Section iter.
     rewrite iter_plus; auto.
   Qed.
 
+  Fact iter_divides p k x : iter p x = x -> iter (p*k) x = x.
+  Proof.
+    intros H.
+    rewrite mult_comm.
+    induction k as [ | k IHk ]; simpl; auto.
+    rewrite iter_plus, H; auto.
+  Qed.
+
 End iter.
 
 Fixpoint list_an a n :=
@@ -227,6 +235,71 @@ Proof.
   rewrite list_an_length; auto.
 Qed.
 
+Fact fact_ge n : n <= fact n.
+Proof.
+  induction n.
+  + simpl; auto.
+  + replace (S n) with ((1+n)*1) at 1 by lia.
+    apply mult_le_compat; auto.
+    apply lt_O_fact.
+Qed.
+
+Fact fact_divides n p : 0 < p <= n -> exists k, p*k = fact n.
+Proof.
+  revert p; induction n as [ | n IHn ]; intros p Hp.
+  + lia.
+  + destruct (eq_nat_dec p (S n)) as [ -> | H ].
+    * exists (fact n); auto.
+    * destruct (IHn p) as (k & Hk).
+      - lia.
+      - exists (k*S n).
+        unfold fact; fold fact; rewrite <- Hk.
+        ring.
+Qed.
+
+Section bound_cycle.
+
+  Variables (X : Type) (l : list X) (Hl : forall x, x ∈ l) (f : X -> X).
+
+  Lemma iter_fix_after x : exists c, 0 < c <= ⌊l⌋ /\ forall n, ⌊l⌋ <= n -> iter f (c+n) x = iter f n x.
+  Proof.
+    destruct php with (l := map (fun n => iter f n x) (list_an 0 (S ⌊l⌋))) (m := l)
+      as (u & a & b & c & Hu).
+    + intro; auto.
+    + rewrite map_length, list_an_length; auto.
+    + apply map_eq_app in Hu as (la & [ | p l1 ] & H & Ha & Hu); [ easy | simpl in Hu ].
+      apply cons_inj in Hu as (Hp & Hu).
+      apply map_eq_app in Hu as (lb & [ | q lc ] & H' & Hb & Hu); [ easy | simpl in Hu ].
+      apply cons_inj in Hu as (Hq & Hc).
+      subst l1.
+      apply list_an_app_inv in H as (G1 & G2 & H). 
+      symmetry in H; rewrite plus_comm in H; simpl in H.
+      apply cons_inj in H as (G3 & H).
+      apply list_an_app_inv in H as (G4 & G5 & H).
+      symmetry in H; rewrite plus_comm in H; simpl in H.
+      apply cons_inj in H as (G6 & G7).
+      exists (q-p); split.
+      1: simpl in *; lia.
+      intros n Hn.
+      replace n with (p+(n-p)) at 2 by (simpl in *; lia).
+      replace (q-p+n) with (q+(n-p)) by (simpl in *; lia).
+      rewrite !iter_plus; f_equal; subst; auto.
+  Qed.
+
+  Theorem bound_cycle : let e := fact ⌊l⌋ in forall x n, ⌊l⌋ <= n -> iter f (e+n) x = iter f n x.
+  Proof.
+    intros e x n Hn.
+    destruct (iter_fix_after x) as (c & H1 & H2).
+    unfold e.
+    specialize (H2 _ Hn).
+    destruct (fact_divides H1) as (k & <-).
+    rewrite plus_comm, iter_plus.
+    apply iter_divides.
+    now rewrite plus_comm, iter_plus in H2.
+  Qed.
+
+End bound_cycle.
+
 Definition injective X Y (f : X -> Y) := forall x₁ x₂, f x₁ = f x₂ -> x₁ = x₂.
 
 Definition inverse X Y (f : X -> Y) g := (forall x, g (f x) = x) /\ forall y, f (g y) = y.
@@ -239,54 +312,11 @@ Section finite_inj_inverse.
   Fact iter_inj n x y : iter f n x = iter f n y -> x = y.
   Proof. revert x y; induction n; simpl; auto. Qed.
 
-  Local Fact cyclic x : exists n, 0 < n <= ⌊l⌋ /\ iter f n x = x.
-  Proof.
-    assert (lhd (map (fun n => iter f n x) (list_an 0 (S ⌊l⌋)))) as H.
-    1:{ apply php_short with (m := l).
-        + intros ? _; auto.
-        + rewrite map_length, list_an_length; auto. }
-    apply lhd_map_split in H as (a & u & b & v & c & H1 & H2).
-    apply list_an_app_inv in H1 as (E & H3 & H4).
-    rewrite plus_comm in H4; simpl in H4.
-    apply cons_inj in H4 as (-> & H4).
-    symmetry in H4.
-    apply list_an_app_inv in H4 as (F & H4 & H5).
-    rewrite plus_comm in H5; simpl in H5.
-    apply cons_inj in H5 as (-> & H5).
-    replace (S (⌊a⌋ + ⌊b⌋)) with ((S ⌊b⌋)+⌊a⌋) in H2 by lia.
-    rewrite iter_plus in H2.
-    apply iter_inj in H2.
-    exists (S ⌊b⌋); split; auto.
-    simpl in E; rewrite app_length in E; simpl in E; lia.
-  Qed.
- 
-  Fact fact_divides n p : 0 < p <= n -> exists k, p*k = fact n.
-  Proof.
-    revert p; induction n as [ | n IHn ]; intros p Hp.
-    + lia.
-    + destruct (eq_nat_dec p (S n)) as [ -> | H ].
-      * exists (fact n); auto.
-      * destruct (IHn p) as (k & Hk).
-        - lia.
-        - exists (k*S n).
-          unfold fact; fold fact; rewrite <- Hk.
-          ring.
-  Qed.
-
-  Fact iter_divides p k x : iter f p x = x -> iter f (p*k) x = x.
-  Proof.
-    intros H.
-    rewrite mult_comm.
-    induction k as [ | k IHk ]; simpl; auto.
-    rewrite iter_plus, H; auto.
-  Qed.
-
-  Hint Resolve iter_divides : core.
-
   Local Theorem finite_inj_id x : iter f (fact ⌊l⌋) x = x.
   Proof.
-    destruct (cyclic x) as (n & H1 & H2).
-    apply fact_divides in H1 as (k & <-); auto.
+    apply iter_inj with (n := ⌊l⌋).
+    rewrite <- iter_plus.
+    apply bound_cycle; auto.
   Qed.
 
   Theorem finite_inj_iter_inverse : { n | inverse f (iter f n) }.
@@ -366,27 +396,34 @@ Section Marc_Hermes.
 
   (* Follow up on https://hermesmarc.github.io/2022/07/22/function-cycling.html *)
 
-  Variables (X : Type) (Xfin : exists l, forall x : X, In x l) (f : X -> X).
+  Variable (X : Type) (Xfin : exists l : list X, forall x, x ∈ l).
 
-  Fact Puzzle_1 : inhabited X -> exists a c, 0 < c /\ iter f c a = a.
+  Implicit Type (f : X -> X). 
+
+  (** See iter_fix_after above *)
+  Fact Puzzle_1 : inhabited X -> forall f, exists a c, 0 < c /\ iter f c a = a.
+  Proof.
+    intros [ x ] f.
+    destruct Xfin as (l & Hl).
+    destruct (iter_fix_after _ Hl f x) as (c & (H1 & H2) & H3).
+    exists (iter f ⌊l⌋ x), c; split; auto.
+    rewrite <- iter_plus, plus_comm.
+    now apply H3.
+  Qed.
+
+  (** See bound_cycle above *)
+  Fact Puzzle_2 : exists k c, k < c /\ forall f x, iter f (c+k) x = iter f k x.
   Proof.
     destruct Xfin as (l & Hl).
-    intros [ x ].
-    set (m := map (fun n => iter f n x) (list_an 0 (S ⌊l⌋))).
-    destruct (@php _ m l) as (a & u & v & w & Ha).
-    + intros ? _; apply Hl.
-    + unfold m; rewrite map_length, list_an_length; auto.
-    + unfold m in Ha.
-      apply map_eq_app in Ha as (lu & [ | p l' ] & H & Hu & Ha).
-      1: easy.
-      simpl in Ha; apply cons_inj in Ha as (Hp & Ha).
-      apply map_eq_app in Ha as (lv & [ | q lw ] & H' & Hv & Ha).
-      1: easy.
-      simpl in Ha; apply cons_inj in Ha as (Hq & Ha).
-      exists a, (q-p).
-  Admitted.
+    exists ⌊l⌋, (fact ⌊l⌋ + fact ⌊l⌋); split.
+    + apply (plus_le_compat 1).
+      * apply lt_O_fact.
+      * apply fact_ge.
+    + intros; rewrite <- plus_assoc, !bound_cycle; auto; lia.
+  Qed.
 
 End Marc_Hermes.
+
 
 
   
