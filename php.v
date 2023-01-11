@@ -24,6 +24,8 @@ Local Infix "⊆" := incl (at level 70, no associativity).
 
 Notation "'lhd' l" := (∃ x m, l ~ₚ x::x::m) (at level 1).
 
+Local Reserved Notation "x ↑ n" (at level 1, left associativity, format "x ↑ n").
+
 Section app_perm_inv.
 
   Variable (X : Type).
@@ -32,20 +34,18 @@ Section app_perm_inv.
 
   Fact app_inv l1 l2 m1 m2 : 
          l1++l2 = m1++m2 
-      -> { k : _ & (l1++k = m1 /\ l2 = k++m2) + (l1 = m1++k /\ k++l2 = m2) }%type.
+       → { k : _ & (l1++k = m1 ∧ l2 = k++m2) + (l1 = m1++k ∧ k++l2 = m2) }%type.
   Proof.
-    revert l1 m1; induction l1 as [ | x l1 IH ]; intros m1.
+    induction l1 as [ | x l1 IH ] in m1 |- *.
     + exists m1; left; auto.
     + destruct m1 as [ | y m1 ].
       * exists (x::l1); right; auto.
-      * simpl; intros H; injection H; clear H; intros H ->.
-        apply IH in H as (k & [ (<- & ->) | (-> & <-) ]); exists k; auto.
+      * simpl; intros H; injection H; clear H. 
+        intros (k & [ (<- & ->) | (-> & <-) ])%IH ->; exists k; auto.
   Qed.
 
   Fact app_inj l1 l2 m1 m2 :
-         l1++l2 = m1++m2 
-      -> ⌊l1⌋ = ⌊m1⌋
-      -> l1 = m1 /\ l2 = m2.
+         l1++l2 = m1++m2 → ⌊l1⌋ = ⌊m1⌋ → l1 = m1 ∧ l2 = m2.
   Proof.
     intros H.
     apply app_inv in H as ([|k] & [ (H1 & H2) | (H1 & H2) ]).
@@ -54,28 +54,19 @@ Section app_perm_inv.
          rewrite app_length in H1; simpl in H1; lia.
   Qed.
 
-  Fact cons_inj x l y m : x::l = y::m -> x = y /\ l = m.
+  Fact cons_inj x l y m : x::l = y::m → x = y ∧ l = m.
   Proof. inversion 1; auto. Qed.
 
-  Fact perm_cons_inv x l m :
-           l ~ₚ x::m
-        -> exists a b, l = a++x::b.
-  Proof.
-    intros H; apply in_split.
-    apply Permutation_in with (1 := Permutation_sym H).
-    simpl; auto.
-  Qed.
+  Fact perm_cons_inv x l m : l ~ₚ x::m → ∃ a b, l = a++x::b.
+  Proof. intros H%Permutation_sym; apply in_split, Permutation_in with (1 := H), in_eq. Qed.
 
-  Fact perm_cons2_inv x y l m :
-           l ~ₚ x::y::m
-        -> ∃ a b c, l = a++x::b++y::c ∨ l = a++y::b++x::c.
+  Fact perm_cons2_inv x y l m : l ~ₚ x::y::m → ∃ a b c, l = a++x::b++y::c ∨ l = a++y::b++x::c.
   Proof.
     intros H.
     destruct perm_cons_inv with (1 := H)
       as (u & v & ->).
     apply perm_trans with (1 := Permutation_middle _ _ _),
-          Permutation_cons_inv in H.
-    apply perm_cons_inv in H as (a & b & H).
+          Permutation_cons_inv, perm_cons_inv in H as (a & b & H).
     apply app_inv in H as (k & [ (<- & ->) | (-> & ?) ]).
     + exists u, k, b; auto.
     + destruct k as [ | ? k ]; simpl in H.
@@ -86,13 +77,18 @@ Section app_perm_inv.
   Qed.
 
   Fact lhd_split l : lhd l → ∃ x a b c, l = a++x::b++x::c.
-  Proof.
-    intros (x & m & Hm).
-    apply perm_cons2_inv in Hm
-      as (? & ? & ? & []); eauto.
-  Qed.
+  Proof. intros (? & ? & (? & ? & ? & [])%perm_cons2_inv); eauto. Qed.
 
 End app_perm_inv.
+
+Fact lhd_map_inv X Y (f : X → Y) l : 
+        lhd (map f l) → ∃ a x b y c, l = a++x::b++y::c ∧ f x = f y.
+Proof.
+  intros (u & a & b & c & H)%lhd_split; revert H.
+  intros (a' & d & -> & Ha & (x & e & -> & Hx & H)%map_eq_cons)%map_eq_app; revert H.
+  intros (b' & d & -> & Hb & (y & c' & -> & Hy & H)%map_eq_cons)%map_eq_app; revert H.
+  exists a', x, b', y, c'; subst; auto.
+Qed.
 
 Section php_short.
 
@@ -103,8 +99,6 @@ Section php_short.
   Hint Resolve incl_nil_l incl_cons
                in_eq in_cons incl_tl
                incl_refl incl_tran : core.
-
-  Reserved Notation "x ↑ n" (at level 1, left associativity, format "x ↑ n").
 
   Fixpoint repeat x n :=
     match n with
@@ -141,7 +135,7 @@ Section php_short.
  
   Theorem php_short l m : l ⊆ m → ⌊m⌋ < ⌊l⌋ → lhd l.
   Proof.
-    revert l; induction m as [ | x m IHm ]; intros l H1 H2.
+    induction m as [ | x m IHm ] in l |- *; intros H1 H2.
     + exfalso; revert H2; apply incl_l_nil in H1 as ->.
       apply lt_irrefl.
     + apply incl_cons_perm in H1 
@@ -158,17 +152,6 @@ Section php_short.
           apply perm_trans with (1 := H1); eauto.
   Qed.
 
-  Fact lhd_map_split Y (f : X -> Y) l : lhd (map f l) → ∃ a x b y c, l = a++x::b++y::c /\ f x = f y.
-  Proof.
-    intros H.
-    apply lhd_split in H as (u & a & b & c & H).
-    apply map_eq_app in H as (a' & d & -> & Ha & H).
-    apply map_eq_cons in H as (x & e & -> & Hx & H).
-    apply map_eq_app in H as (b' & d & -> & Hb & H).
-    apply map_eq_cons in H as (y & c' & -> & Hy & Hc).
-    exists a', x, b', y, c'; subst; auto.
-  Qed.
-
   Hint Resolve php_short lhd_split : core.
 
   Theorem php l m : l ⊆ m → ⌊m⌋ < ⌊l⌋ → ∃ x a b c, l = a++x::b++x::c.
@@ -178,11 +161,11 @@ End php_short.
 
 Section iter.
 
-  Variables (X : Type) (f : X -> X).
+  Variables (X : Type) (f : X → X).
 
   Fixpoint iter n x :=
     match n with
-      | 0 => x
+      | 0   => x
       | S n => iter n (f x)
     end.
 
@@ -190,41 +173,38 @@ Section iter.
   Proof. revert x; induction n; simpl; f_equal; auto. Qed.
 
   Fact iter_S n x : iter (S n) x = f (iter n x).
-  Proof.
-    replace (S n) with (n+1) by lia.
-    rewrite iter_plus; auto.
-  Qed.
+  Proof. replace (S n) with (n+1) by lia; now rewrite iter_plus. Qed.
 
-  Fact iter_divides p k x : iter p x = x -> iter (p*k) x = x.
+  Fact iter_divides p k x : iter p x = x → iter (p*k) x = x.
   Proof.
     intros H.
     rewrite mult_comm.
-    induction k as [ | k IHk ]; simpl; auto.
-    rewrite iter_plus, H; auto.
+    induction k; simpl; auto.
+    now rewrite iter_plus, H.
   Qed.
 
 End iter.
 
 Fixpoint list_an a n :=
   match n with
-    | 0 => []
+    | 0   => []
     | S n => a::(list_an (S a) n)
   end.
 
 Fact list_an_plus a n m : list_an a (n+m) = list_an a n ++ list_an (n+a) m.
 Proof.
-  revert a; induction n as [ | n IHn ]; intros a; simpl; f_equal; try lia.
+  induction n as [ | n IHn ] in a |- *; simpl; f_equal; try lia.
   rewrite IHn; do 2 f_equal; lia.
 Qed.
 
 Fact list_an_length a n : ⌊list_an a n⌋ = n.
-Proof. revert a; induction n; simpl; auto. Qed.
+Proof. induction n in a |- *; simpl; auto. Qed.
 
 Fact list_an_app_inv a n l m : 
          list_an a n = l++m 
-      -> n = ⌊l⌋+⌊m⌋ 
-      /\ l = list_an a ⌊l⌋ 
-      /\ m = list_an (⌊l⌋+a) ⌊m⌋.
+       → n = ⌊l⌋+⌊m⌋ 
+       ∧ list_an a ⌊l⌋ = l 
+       ∧ list_an (⌊l⌋+a) ⌊m⌋ = m.
 Proof.
   intros H.
   generalize H; intros E.
@@ -235,18 +215,47 @@ Proof.
   rewrite list_an_length; auto.
 Qed.
 
-Fact fact_ge n : n <= fact n.
+Fact list_an_cons_inv a n x l :
+          list_an a n = x::l
+        → match n with 
+            | 0   => False 
+            | S m => a = x ∧ list_an (S a) m = l
+          end.
 Proof.
-  induction n.
+  destruct n as [ | m ]; simpl.
+  + easy.
+  + intros (<- & ?)%cons_inj; eauto.
+Qed.
+
+Fact list_an_complex_inv a n u x v y w :
+          list_an a n = u++x::v++y::w
+        → u = list_an a ⌊u⌋
+        ∧ x = a+⌊u⌋
+        ∧ v = list_an (S x) ⌊v⌋
+        ∧ y = 1+a+⌊u⌋+⌊v⌋
+        ∧ w = list_an (S y) ⌊w⌋
+        ∧ n = 2+⌊u⌋+⌊v⌋+⌊w⌋.
+Proof.
+  intros (G1 & G2 & H1)%list_an_app_inv; simpl in H1, G1; revert H1.
+  intros (G3 & (G4 & G5 & H1)%list_an_app_inv)%cons_inj; simpl in H1; revert H1.
+  intros (G6 & G7)%cons_inj.
+  simpl in *; repeat split; auto; try lia.
+  + rewrite <- G5 at 1; subst; auto.
+  + rewrite <- G7 at 1; subst; auto.
+Qed.
+
+Fact fact_ge n : n ≤ fact n.
+Proof.
+  induction n as [ | n ].
   + simpl; auto.
   + replace (S n) with ((1+n)*1) at 1 by lia.
     apply mult_le_compat; auto.
     apply lt_O_fact.
 Qed.
 
-Fact fact_divides n p : 0 < p <= n -> exists k, p*k = fact n.
+Fact fact_divides n p : 0 < p <= n → ∃k, p*k = fact n.
 Proof.
-  revert p; induction n as [ | n IHn ]; intros p Hp.
+  induction n as [ | n IHn ] in p |- *; intros Hp.
   + lia.
   + destruct (eq_nat_dec p (S n)) as [ -> | H ].
     * exists (fact n); auto.
@@ -259,38 +268,29 @@ Qed.
 
 Section bound_cycle.
 
-  Variables (X : Type) (l : list X) (Hl : forall x, x ∈ l) (f : X -> X).
+  Variables (X : Type) (l : list X) (Hl : ∀x, x ∈ l) (f : X → X).
 
-  Lemma iter_fix_after x : exists c, 0 < c <= ⌊l⌋ /\ forall n, ⌊l⌋ <= n -> iter f (c+n) x = iter f n x.
+  Infix "↑" := iter.
+
+  Lemma iter_fix_after x : ∃c, 0 < c <= ⌊l⌋ ∧ ∀n, ⌊l⌋ ≤ n → f↑(c+n) x = f↑n x.
   Proof.
-    destruct php with (l := map (fun n => iter f n x) (list_an 0 (S ⌊l⌋))) (m := l)
-      as (u & a & b & c & Hu).
-    + intro; auto.
-    + rewrite map_length, list_an_length; auto.
-    + apply map_eq_app in Hu as (la & [ | p l1 ] & H & Ha & Hu); [ easy | simpl in Hu ].
-      apply cons_inj in Hu as (Hp & Hu).
-      apply map_eq_app in Hu as (lb & [ | q lc ] & H' & Hb & Hu); [ easy | simpl in Hu ].
-      apply cons_inj in Hu as (Hq & Hc).
-      subst l1.
-      apply list_an_app_inv in H as (G1 & G2 & H). 
-      symmetry in H; rewrite plus_comm in H; simpl in H.
-      apply cons_inj in H as (G3 & H).
-      apply list_an_app_inv in H as (G4 & G5 & H).
-      symmetry in H; rewrite plus_comm in H; simpl in H.
-      apply cons_inj in H as (G6 & G7).
-      exists (q-p); split.
+    destruct lhd_map_inv with (f := λ n, f↑n x) (l := list_an 0 (S ⌊l⌋))
+      as (a & i & b & j & c & (G1 & G2 & G3 & G4 & G5 & G6)%list_an_complex_inv & H2).
+    + apply php_short with (m := l).
+      * intro; auto.
+      * rewrite map_length, list_an_length; auto.
+    + exists (j-i); split.
       1: simpl in *; lia.
       intros n Hn.
-      replace n with (p+(n-p)) at 2 by (simpl in *; lia).
-      replace (q-p+n) with (q+(n-p)) by (simpl in *; lia).
-      rewrite !iter_plus; f_equal; subst; auto.
+      replace n with (i+(n-i)) at 2 by (simpl in *; lia).
+      replace (j-i+n) with (j+(n-i)) by (simpl in *; lia).
+      rewrite !iter_plus; f_equal; auto.
   Qed.
 
-  Theorem bound_cycle : let e := fact ⌊l⌋ in forall x n, ⌊l⌋ <= n -> iter f (e+n) x = iter f n x.
+  Theorem bound_cycle : ∀ x n, ⌊l⌋ ≤ n -> f↑(fact ⌊l⌋+n) x = f↑n x.
   Proof.
-    intros e x n Hn.
+    intros x n Hn.
     destruct (iter_fix_after x) as (c & H1 & H2).
-    unfold e.
     specialize (H2 _ Hn).
     destruct (fact_divides H1) as (k & <-).
     rewrite plus_comm, iter_plus.
@@ -300,19 +300,56 @@ Section bound_cycle.
 
 End bound_cycle.
 
-Definition injective X Y (f : X -> Y) := forall x₁ x₂, f x₁ = f x₂ -> x₁ = x₂.
+Section Marc_Hermes.
 
-Definition inverse X Y (f : X -> Y) g := (forall x, g (f x) = x) /\ forall y, f (g y) = y.
+  (** Follow up on https://hermesmarc.github.io/2022/07/22/function-cycling.html 
+
+      Notice that the statement of Puzzle 1 is incorrect because X could be empty
+      Notice that the constraint k < c in Puzzle 2 seems a bit artificial *)
+
+  Variable (X : Type) (Xfin : ∃l, ∀x : X, x ∈ l).
+
+  Implicit Type (f : X → X).
+
+  Infix "↑" := iter.
+
+  (** See iter_fix_after above *)
+  Fact Puzzle_1 : inhabited X → ∀f, ∃ a c, 0 < c ∧ f↑c a = a.
+  Proof.
+    intros [ x ] f.
+    destruct Xfin as (l & Hl).
+    destruct (iter_fix_after l Hl f x) as (c & (H1 & H2) & H3).
+    exists (f↑⌊l⌋ x), c; split; auto.
+    rewrite <- iter_plus, plus_comm.
+    now apply H3.
+  Qed.
+
+  (** See bound_cycle above *)
+  Fact Puzzle_2 : ∃ k c, k < c ∧ ∀ f x, f↑(c+k) x = f↑k x.
+  Proof.
+    destruct Xfin as (l & Hl).
+    exists ⌊l⌋, (fact ⌊l⌋ + fact ⌊l⌋); split.
+    + apply plus_le_compat with (1 := lt_O_fact _) (2 := fact_ge _).
+    + intros; rewrite <- plus_assoc, !bound_cycle; auto; lia.
+  Qed.
+
+End Marc_Hermes.
+
+Definition injective X Y (f : X → Y) := ∀ x₁ x₂, f x₁ = f x₂ → x₁ = x₂.
+
+Definition inverse X Y (f : X → Y) g := (∀x, g (f x) = x) ∧ ∀y, f (g y) = y.
 
 Section finite_inj_inverse.
 
-  Variable (X : Type) (f : X -> X) (Hf : injective f) 
-           (l : list X) (Hl : forall x, x ∈ l).
+  Variable (X : Type) (f : X → X) (Hf : injective f) 
+           (l : list X) (Hl : ∀x, x ∈ l).
 
-  Fact iter_inj n x y : iter f n x = iter f n y -> x = y.
-  Proof. revert x y; induction n; simpl; auto. Qed.
+  Infix "↑" := iter.
 
-  Local Theorem finite_inj_id x : iter f (fact ⌊l⌋) x = x.
+  Fact iter_inj n : ∀ x y, f↑n x = f↑n y → x = y.
+  Proof. induction n; simpl; auto. Qed.
+
+  Local Theorem finite_inj_id x : f↑(fact ⌊l⌋) x = x.
   Proof.
     apply iter_inj with (n := ⌊l⌋).
     rewrite <- iter_plus.
@@ -331,23 +368,22 @@ Section finite_inj_inverse.
   Qed.
 
   Theorem finite_inj_inverse : { g | inverse f g }.
-  Proof.
-    destruct finite_inj_iter_inverse as (n & Hn); eauto.
-  Qed.
+  Proof. destruct finite_inj_iter_inverse; eauto. Qed.
 
 End finite_inj_inverse.
 
 Section Cantor_Bernstein_finite.
 
-  Variable (X Y : Type) (f : X -> Y) (g : Y -> X) 
-           (Hf : injective f) (Hg : injective g)
-           (HX : exists l : list X, forall x, x ∈ l).
+  Variable (X Y : Type) 
+           (f : X → Y) (Hf : injective f)
+           (g : Y → X) (Hg : injective g)
+           (Xfin : ∃l, ∀x : X, x ∈ l).
 
   Theorem Cantor_Bernstein_finite : 
-             (exists fi, inverse f fi) 
-          /\ (exists gi, inverse g gi).
+             (∃fi, inverse f fi) 
+          /\ (∃gi, inverse g gi).
   Proof.
-    destruct HX as (l & Hl).
+    destruct Xfin as (l & Hl).
     destruct finite_inj_inverse with (f := fun x => g (f x)) 
              (l := l) as (h & H1 & H2); auto; [ | split ].
     + intros ? ? ?; auto.
@@ -361,18 +397,18 @@ Section Kuratowski.
 
   Variable (X : Type).
 
-  Inductive kuratowski_fin : (X -> Prop) -> Prop :=
-    | kfin_empty P : (forall x, ~ P x) -> kuratowski_fin P
-    | kfin_cons P y Q : (forall x, P x <-> y = x \/ Q x) -> kuratowski_fin Q -> kuratowski_fin P.
+  Inductive kuratowski_fin : (X → Prop) → Prop :=
+    | kfin_empty P : (∀x, ~ P x) → kuratowski_fin P
+    | kfin_cons P y Q : (∀x, P x <-> y = x \/ Q x) → kuratowski_fin Q → kuratowski_fin P.
 
-  Fact kuratowski_fin_listable P : kuratowski_fin P -> exists l, forall x, P x <-> x ∈ l.
+  Fact kuratowski_fin_listable P : kuratowski_fin P -> ∃l, ∀x, P x <-> x ∈ l.
   Proof.
     induction 1 as [ P HP | P y Q HP HQ (l & Hl) ].
     + exists nil; simpl; firstorder.
     + exists (y::l); intro; rewrite HP, Hl; simpl; firstorder.
   Qed.
 
-  Fact listable_kuratowski_fin P : (exists l, forall x, P x <-> x ∈ l) -> kuratowski_fin P.
+  Fact listable_kuratowski_fin P : (∃l, ∀x, P x <-> x ∈ l) → kuratowski_fin P.
   Proof.
     intros (l & Hl); revert P Hl.
     induction l as [ | y l IHl ]; intros P Hl.
@@ -385,47 +421,15 @@ End Kuratowski.
 
 Definition kuratowski_finite X := kuratowski_fin (fun _ : X => True).
 
-Fact kuratowski_finite_listable X : kuratowski_finite X -> exists l, forall x : X, x ∈ l.
+Fact kuratowski_finite_listable X : kuratowski_finite X <-> ∃l, ∀x : X, x ∈ l.
 Proof.
-  intros H.
-  apply kuratowski_fin_listable in H as (l & Hl).
-  exists l; intro; apply Hl; auto.
+  split.
+  + intros H.
+    apply kuratowski_fin_listable in H as (l & Hl).
+    exists l; intro; apply Hl; auto.
+  + intros (l & Hl); apply listable_kuratowski_fin; exists l; split; eauto.
 Qed.
 
-Section Marc_Hermes.
-
-  (** Follow up on https://hermesmarc.github.io/2022/07/22/function-cycling.html 
-
-      Notice that the statement of Puzzle 1 is incorrect because X could be empty
-      Notice that the constraint k < c in Puzzle 2 seems a bit artificial *)
-
-  Variable (X : Type) (Xfin : exists l : list X, forall x, x ∈ l).
-
-  Implicit Type (f : X -> X). 
-
-  (** See iter_fix_after above *)
-  Fact Puzzle_1 : inhabited X -> forall f, exists a c, 0 < c /\ iter f c a = a.
-  Proof.
-    intros [ x ] f.
-    destruct Xfin as (l & Hl).
-    destruct (iter_fix_after _ Hl f x) as (c & (H1 & H2) & H3).
-    exists (iter f ⌊l⌋ x), c; split; auto.
-    rewrite <- iter_plus, plus_comm.
-    now apply H3.
-  Qed.
-
-  (** See bound_cycle above *)
-  Fact Puzzle_2 : exists k c, k < c /\ forall f x, iter f (c+k) x = iter f k x.
-  Proof.
-    destruct Xfin as (l & Hl).
-    exists ⌊l⌋, (fact ⌊l⌋ + fact ⌊l⌋); split.
-    + apply (plus_le_compat 1).
-      * apply lt_O_fact.
-      * apply fact_ge.
-    + intros; rewrite <- plus_assoc, !bound_cycle; auto; lia.
-  Qed.
-
-End Marc_Hermes.
 
 
 
