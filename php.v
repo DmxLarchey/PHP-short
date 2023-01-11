@@ -287,6 +287,20 @@ Section bound_cycle.
       rewrite !iter_plus; f_equal; auto.
   Qed.
 
+  (** Notice that fact ⌊l⌋ could be replaced by 
+
+               LCM {1,2,...,⌊l⌋}
+
+      See http://oeis.org/A003418. It grows faster
+      than 2^(⌊l⌋-1) but it much smaller than fact ⌊l⌋.
+
+      Also notice that ⌊l⌋ may (optimally) be replaced by 
+      the cardinal |X| of X but to compute it from the list l 
+      above, one may moreover need the discreteness of X (to
+      detect and remove the duplicates in l. 
+
+   *)
+
   Theorem bound_cycle : ∀ x n, ⌊l⌋ ≤ n -> f↑(fact ⌊l⌋+n) x = f↑n x.
   Proof.
     intros x n Hn.
