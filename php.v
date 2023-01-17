@@ -272,7 +272,7 @@ Section bound_cycle.
 
   Infix "↑" := iter.
 
-  Lemma iter_fix_after x : ∃c, 0 < c <= ⌊l⌋ ∧ ∀n, ⌊l⌋ ≤ n → f↑(c+n) x = f↑n x.
+  Lemma iter_fix_after x : ∃c, 0 < c <= ⌊l⌋ ∧ ∀n, ⌊l⌋ ≤ 1+n → f↑(c+n) x = f↑n x.
   Proof.
     destruct lhd_map_inv with (f := λ n, f↑n x) (l := list_an 0 (S ⌊l⌋))
       as (a & i & b & j & c & (G1 & G2 & G3 & G4 & G5 & G6)%list_an_complex_inv & H2).
@@ -301,7 +301,7 @@ Section bound_cycle.
 
    *)
 
-  Theorem bound_cycle : ∀ x n, ⌊l⌋ ≤ n -> f↑(fact ⌊l⌋+n) x = f↑n x.
+  Theorem bound_cycle : ∀ x n, ⌊l⌋ ≤ 1+n -> f↑(fact ⌊l⌋+n) x = f↑n x.
   Proof.
     intros x n Hn.
     destruct (iter_fix_after x) as (c & H1 & H2).
@@ -313,6 +313,13 @@ Section bound_cycle.
   Qed.
 
 End bound_cycle.
+
+Fact Kaminski_equation f (x : bool) : f (f (f x)) = f x.
+Proof.
+  apply bound_cycle with (n := 1) (l := true::false::nil).
+  + intros []; simpl; auto.
+  + simpl; auto.
+Qed.
 
 Section Marc_Hermes.
 
