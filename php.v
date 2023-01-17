@@ -326,7 +326,7 @@ Section Marc_Hermes.
   (** Follow up on https://hermesmarc.github.io/2022/07/22/function-cycling.html 
 
       Notice that the statement of Puzzle 1 is incorrect because X could be empty
-      Notice that the constraint k < c in Puzzle 2 seems a bit artificial *)
+      Notice that the constraint k < c in Puzzle 2 seems a bit artificial (now replaced with 0 < c) *)
 
   Variable (X : Type) (Xfin : ∃l, ∀x : X, x ∈ l).
 
@@ -342,16 +342,16 @@ Section Marc_Hermes.
     destruct (iter_fix_after l Hl f x) as (c & (H1 & H2) & H3).
     exists (f↑⌊l⌋ x), c; split; auto.
     rewrite <- iter_plus, plus_comm.
-    now apply H3.
+    apply H3; lia.
   Qed.
 
   (** See bound_cycle above *)
-  Fact Puzzle_2 : ∃ k c, k < c ∧ ∀ f x, f↑(c+k) x = f↑k x.
+  Fact Puzzle_2 : ∃ k c, 0 < c ∧ ∀ f x, f↑(c+k) x = f↑k x.
   Proof.
     destruct Xfin as (l & Hl).
-    exists ⌊l⌋, (fact ⌊l⌋ + fact ⌊l⌋); split.
-    + apply plus_le_compat with (1 := lt_O_fact _) (2 := fact_ge _).
-    + intros; rewrite <- plus_assoc, !bound_cycle; auto; lia.
+    exists ⌊l⌋, (fact ⌊l⌋); split.
+    + apply lt_O_fact.
+    + intros; apply bound_cycle; auto.
   Qed.
 
 End Marc_Hermes.
